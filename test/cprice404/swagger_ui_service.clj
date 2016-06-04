@@ -174,6 +174,17 @@
 (spec/def :spec-swagger.json/produces :spec-swagger.json/mime-types)
 (spec/def :spec-swagger.json/consumes :spec-swagger.json/mime-types)
 
+(spec/def :spec-swagger.json/operations
+  (spec/map-of :spec-swagger/http-method
+               :spec-swagger.json/operation))
+
+(spec/def :spec-swagger.json/operation
+  (spec/keys :req-un [:spec-swagger.json.operation/responses]
+             :opt-un [:spec-swagger.operation/summary
+                      :spec-swagger.operation/description
+                      :spec-swagger.operation/tags
+                      :spec-swagger.json.operation/parameters]))
+
 (spec/def :spec-swagger/swagger-json
   (spec/and
    (spec/keys :req-un [:spec-swagger.json/swagger
@@ -190,14 +201,32 @@
                        :produces ["application/json"]
                        :consumes ["application/json"]})
 
+(def operation-defaults {:responses {:default {:description ""}}})
+
+(defn transform-operation
+  [operation]
+  (merge
+   operation-defaults
+   operation))
+
+(spec/fdef transform-operation
+           :args (spec/cat :operation :spec-swagger/operation)
+           :ret :spec-swagger.json/operation)
+
+
 (defn transform-operations
   [operations]
   (println "TRANSFORMING OPERATIONS:" operations)
-  operations)
+  (reduce
+   (fn [acc [k v]]
+     (println "ABOUT TO TRANSFORM: " v)
+     (assoc acc k (transform-operation v)))
+   {}
+   operations))
 
 (spec/fdef transform-operations
            :args (spec/cat :operations :spec-swagger/operations)
-           :ret :spec-swagger/operations)
+           :ret :spec-swagger.json/operations)
 
 (defn extract-paths-and-definitions
   [paths]
