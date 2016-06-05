@@ -380,7 +380,7 @@
            :args (spec/cat :operations :spec-swagger/operations)
            :ret :spec-swagger.json/operations)
 
-(defn extract-paths-and-definitions
+(defn transform-paths
   [paths]
   (reduce-kv
    (fn [acc route operations]
@@ -388,17 +388,88 @@
    {}
    paths))
 
-(spec/fdef extract-paths-and-definitions
+(spec/fdef transform-paths
            :args (spec/cat :paths :spec-swagger/paths))
+
+;:definitions {"User" {:additionalProperties false
+;                      :properties {:address {:$ref "#/definitions/UserAddress"}
+;                                   :id {:type "string"}
+;                                   :name {:type "string"}}
+;                      :required :address
+;                      :type "object"}
+;              "UserAddress" {:additionalProperties false
+;                             :properties {:city {:enum nil
+;                                                 :type "string"}
+;                                          :street {:type "string"}}
+;                             :required nil
+;                             :type "object"}}
+
+;(schema/defschema User {:id schema/Str,
+;                        :name schema/Str
+;                        :address {:street schema/Str
+;                                  :city (schema/enum :tre :hki)}})
+
+(defn find-schemas-for-parameters
+  [parameters]
+  (->> #spy/d parameters
+       (filter #(contains? % :schema))
+       (map :schema)
+       set))
+
+;; TODO consolidate
+(defn find-schemas-for-responses
+  [responses]
+  (->> responses
+       (filter #(contains? % :schema))
+       (map :schema)
+       set))
+
+(defn find-schemas-for-operations
+  [operations]
+  (reduce
+   (fn [acc operation]
+     (set/union
+      acc
+      (find-schemas-for-parameters (flatten (vals (:parameters operation))))
+      (find-schemas-for-responses (vals (:responses operation)))))
+   #{}
+   operations))
+
+(defn find-schemas
+  [paths]
+  (reduce
+   (fn [acc path]
+     (set/union acc (find-schemas-for-operations #spy/d (vals path))))
+   #{}
+   (vals paths)))
+
+(defn build-definitions
+  [schema]
+  ;; TODO: assert that the spec is a keys spec
+  (let [spec-keys (nth (spec/describe (:spec schema)) 2)]
+    {(:schema-name schema)
+     {:additionalProperties false
+      :type "object"
+      :properties (reduce (fn [acc k]
+                            (assoc acc (keyword (name k))
+                                       {:type (spec/describe k)}))
+                          {}
+                          spec-keys)}}))
+
+(defn extract-definitions
+  [paths]
+  (let [schemas (find-schemas paths)]
+    (mapcat build-definitions schemas)))
+
 
 (defn spec-swagger-json
   [swagger]
-  #_(extract-paths-and-definitions (:paths swagger))
+  #_(transform-paths (:paths swagger))
   (merge
    swagger-defaults
    (-> swagger
-       (assoc :paths (extract-paths-and-definitions (:paths swagger)))))
-  #_(let [[paths definitions] (extract-paths-and-definitions (:paths swagger))]
+       (assoc :paths (transform-paths (:paths swagger)))))
+  #_(let [[paths definitions] (transform-paths (:paths swagger))]
     (merge
      swagger-defaults
      (-> swagger
