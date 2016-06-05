@@ -443,14 +443,52 @@
    #{}
    (vals paths)))
 
+(declare get-keys-from-spec)
+
+(defn get-keys-from-seq-spec-desc
+  [spec-desc]
+  (println "get keys from seq spec:" spec-desc)
+  (condp = (first spec-desc)
+        ;; need to deal with key specs that have both req and opt
+        'keys (set (nth spec-desc 2))
+        'and  (set (mapcat get-keys-from-spec-desc (rest spec-desc)))
+
+        (throw (IllegalStateException.
+                (str "Unsupported spec:" (prn-str spec-desc))))))
+
+(defn get-keys-from-spec-desc
+  [spec-desc]
+  (println "getting keys from spec-desc:" spec-desc)
+  (println "spec desc is coll?:" (coll? spec-desc))
+  (if (coll? spec-desc)
+    (get-keys-from-seq-spec-desc spec-desc)
+    (cond
+      (keyword? spec-desc)
+      (get-keys-from-spec spec-desc)
+
+      :else
+      (throw (IllegalStateException.
+              (str "Unsupported spec: " (prn-str spec-desc)))))))
+
+(defn get-keys-from-spec
+  [spec]
+  (println "getting keys from spec:" spec)
+  (let [spec-desc (spec/describe spec)]
+    (println "spec desc:" spec-desc)
+    (if (= :clojure.spec/unknown spec-desc)
+      (throw (IllegalStateException.
+              (str "Unable to find spec definition for: '" spec "'")))
+      (get-keys-from-spec-desc spec-desc))))
+
 (defn build-definitions
   [schema]
-  ;; TODO: assert that the spec is a keys spec
-  (let [spec-keys (nth (spec/describe (:spec schema)) 2)]
+  (let [spec-keys (get-keys-from-spec (:spec schema))]
+    (println "Spec keys:" spec-keys)
     {(:schema-name schema)
      {:additionalProperties false
       :type "object"
       :properties (reduce (fn [acc k]
+                            (println "adding spec for k:" k)
                             (assoc acc (keyword (name k))
                                        {:type (spec/describe k)}))
                           {}

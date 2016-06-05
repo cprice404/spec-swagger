@@ -4,9 +4,25 @@
             [clojure.spec :as spec]
             [ring.swagger.validator :as swagger-validator]))
 
-;(def test-user-schema
-;  {:schema-name "User"
-;   :spec ::test-user-schema})
+(def test-user-schema
+  {:schema-name "User"
+   :spec :swagger-ui-service-test/test-user-schema})
+
+(spec/def :swagger-ui-service-test/test-user-schema
+  (spec/keys :req-un [:swagger-ui-test.test-user-schema/id
+                      :swagger-ui-test.test-user-schema/name
+                      :swagger-ui-test.test-user-schema/address]))
+
+(def test-user-with-age-schema
+  {:schema-name "UserWithAge"
+   :spec :swagger-ui-service-test/test-user-with-age-schema})
+
+(spec/def :swagger-ui-service-test/test-user-with-age-schema
+  (spec/and
+   :swagger-ui-service-test/test-user-schema
+   (spec/keys :req-un [:swagger-ui-test.test-user-schema/age])))
+
+(spec/def :swagger-ui-test.test-user-schema/age integer?)
 
 (def sample-operation
   {:summary "User Api"
@@ -25,10 +41,8 @@
                   :name "BODY PARAM"
                   :description "BODY PARAM DESC"
                   :required true
-                  :schema {:schema-name "UserWithAge"
-                           :spec ::test-user-with-age-schema}}]},
-   :responses {200 {:schema {:schema-name "User"
-                             :spec ::test-user-schema}
+                  :schema test-user-with-age-schema}]},
+   :responses {200 {:schema test-user-schema
                     :description "Found it!"}
                404 {:description "Ohnoes."}}})
 
@@ -45,7 +59,7 @@
                  :name "BODY PARAM",
                  :description "BODY PARAM DESC",
                  :required true,
-                 :schema {:$ref "#/definitions/User"}}],
+                 :schema {:$ref "#/definitions/UserWithAge"}}],
    :responses {200 {:schema {:$ref "#/definitions/User"},
                     :description "Found it!"},
                404 {:description "Ohnoes."}}})
@@ -69,9 +83,24 @@
 
 (deftest find-schemas-test
   (testing "can find schemas in parameters and responses"
-    (is (= #{::test-user-schema ::test-user-with-age-schema}
+    (is (= #{test-user-schema test-user-with-age-schema}
            (svc/find-schemas {"/api/ping" {:get {}}
                               "/user/{id}" {:post sample-operation}})))))
+
+(deftest get-keys-from-spec-test
+  (testing "simple spec with keys"
+    (is (= #{:swagger-ui-test.test-user-schema/id
+             :swagger-ui-test.test-user-schema/name
+             :swagger-ui-test.test-user-schema/address}
+           (svc/get-keys-from-spec
+            :swagger-ui-service-test/test-user-schema))))
+  (testing "spec which 'and's in keys"
+    (is (= #{:swagger-ui-test.test-user-schema/id
+             :swagger-ui-test.test-user-schema/name
+             :swagger-ui-test.test-user-schema/address
+             :swagger-ui-test.test-user-schema/age}
+           (svc/get-keys-from-spec
+            :swagger-ui-service-test/test-user-with-age-schema)))))
 
 (deftest extract-definitions-test
   (testing "able to extract definitions from paths"
