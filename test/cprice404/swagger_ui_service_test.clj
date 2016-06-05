@@ -13,6 +13,13 @@
                       :swagger-ui-test.test-user-schema/name
                       :swagger-ui-test.test-user-schema/address]))
 
+(spec/def :swagger-ui-test.test-user-schema/id string?)
+(spec/def :swagger-ui-test.test-user-schema/name string?)
+
+(spec/def :swagger-ui-test.test-user-schema/address
+  (spec/keys :req-un [:swagger-ui-test.test-user-schema.address/street
+                      :swagger-ui-test.test-user-schema.address/city]))
+
 (def test-user-with-age-schema
   {:schema-name "UserWithAge"
    :spec :swagger-ui-service-test/test-user-with-age-schema})

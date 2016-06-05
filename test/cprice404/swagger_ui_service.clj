@@ -480,25 +480,47 @@
               (str "Unable to find spec definition for: '" spec "'")))
       (get-keys-from-spec-desc spec-desc))))
 
+(defn get-type-for-seq-spec-desc
+  [spec spec-desc]
+  ;; TODO: check that spec-desc is a map
+  (str "#/definitions/" (name spec)))
+
+(defn get-type-for-spec
+  [spec]
+  (let [spec-desc (spec/describe spec)]
+    (println "Creating type for spec desc:" spec-desc)
+    (if (coll? spec-desc)
+      (get-type-for-seq-spec-desc spec spec-desc)
+      (condp = spec-desc
+        'string? "string"
+        'integer? "integer"
+
+        (throw (IllegalStateException. (str "Unable to create type for spec " (pr-str spec-desc))))))))
+
 (defn build-definitions
   [schema]
   (let [spec-keys (get-keys-from-spec (:spec schema))]
     (println "Spec keys:" spec-keys)
-    {(:schema-name schema)
+    [(:schema-name schema)
      {:additionalProperties false
       :type "object"
-      :properties (reduce (fn [acc k]
-                            (println "adding spec for k:" k)
-                            (assoc acc (keyword (name k))
-                                       {:type (spec/describe k)}))
-                          {}
-                          spec-keys)}}))
+      :properties (reduce
+                   (fn [acc k]
+                     (println "adding spec for k:" k)
+                     (assoc acc (keyword (name k))
+                                {:type (get-type-for-spec k)}))
+                   {}
+                   spec-keys)}]))
 
 (defn extract-definitions
   [paths]
   (let [schemas (find-schemas paths)]
-    (mapcat build-definitions schemas)))
-
+    (reduce
+     (fn [acc schema]
+       (let [[n s] (build-definitions schema)]
+         (assoc acc n s)))
+     {}
+     schemas)))
 
 (defn spec-swagger-json
   [swagger]
