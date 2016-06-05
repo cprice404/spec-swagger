@@ -64,9 +64,27 @@
 ;              (opt :license) {:name s/Str
 ;                              (opt :url) s/Str}})
 
+(defn boolean?
+  [x]
+  (instance? Boolean x))
+
 (defn no-extra-keys?
   [expected-keys m]
   (empty? (set/difference (set (keys m)) (set expected-keys))))
+
+(defn assoc-if-not-nil
+  [m k v]
+  (if v
+    (assoc m k v)
+    m))
+
+(defn assoc-if-not-empty
+  [m k v]
+  (if (empty? v)
+    m
+    (assoc m k v)))
+
+
 
 (spec/def :spec-swagger/swagger
   (spec/keys :opt-un [:spec-swagger/info :spec-swagger/paths]))
@@ -114,36 +132,45 @@
                                       :delete :options :head})
 (spec/def :spec-swagger/http-response-code integer?)
 
-;(spec/def :spec-swagger.operation.parameter/source
-;  #{:spec-swagger.operation.parameter.source/path
-;    :spec-swagger.operation.parameter.source/body})
+(spec/def :spec-swagger.operation.parameter/source
+  #{:spec-swagger.operation.parameter.source/path
+    :spec-swagger.operation.parameter.source/body})
 
 (spec/def :spec-swagger.operation/parameter
-  (spec/and :spec-swagger.operation.parameter/base
+  (spec/or :normal-parameter :spec-swagger.operation/normal-parameter
+           :body-parameter :spec-swagger.operation/body-parameter))
+
+(spec/def :spec-swagger.operation/normal-parameter
+  (spec/and :spec-swagger.operation/base-parameter
             (spec/keys
              :req-un [:spec-swagger.operation.parameter/type])))
 
-(spec/def :spec-swagger.operation.parameter.source/path
-  (spec/+ :spec-swagger.operation/parameter))
-
 (spec/def :spec-swagger.operation/body-parameter
-  (spec/and :spec-swagger.operation.parameter/base
+  (spec/and :spec-swagger.operation/base-parameter
             (spec/keys
              :req-un [:spec-swagger.operation.parameter/schema])))
 
-(spec/def :spec-swagger.operation.parameter.source/body
-  :spec-swagger.operation/body-parameter)
-
-
-(spec/def :spec-swagger.operation.parameter/base
+(spec/def :spec-swagger.operation/base-parameter
   (spec/keys :req-un [:spec-swagger.operation.parameter/name
-                      :spec-swagger.operation.parameter/description]))
+                      :spec-swagger.operation.parameter/description
+                      :spec-swagger.operation.parameter/required]))
 
 (spec/def :spec-swagger.operation.parameter/name string?)
 (spec/def :spec-swagger.operation.parameter/description string?)
+(spec/def :spec-swagger.operation.parameter/required boolean?)
 
 (spec/def :spec-swagger.operation.parameter/type
   #{"string"})
+
+(spec/def :spec-swagger.operation.parameter/schema
+  string?)
+
+(spec/def :spec-swagger.operation.parameter.source/path
+  (spec/+ :spec-swagger.operation/normal-parameter))
+
+(spec/def :spec-swagger.operation.parameter.source/body
+  (spec/tuple :spec-swagger.operation/body-parameter))
+
 ;
 ;(defmulti parameter-source :spec-swagger.operation.parameter/source)
 ;(defmethod parameter-source :spec-swagger.operation.parameter.source/body [_]
@@ -185,6 +212,30 @@
                       :spec-swagger.operation/tags
                       :spec-swagger.json.operation/parameters]))
 
+(spec/def :spec-swagger.json.operation/parameter
+  (spec/or :normal-parameter :spec-swagger.json.operation/normal-parameter
+           :body-parameter :spec-swagger.json.operation/body-parameter))
+
+(spec/def :spec-swagger.json.operation/base-parameter
+  (spec/keys :req-un [:spec-swagger.json.operation.parameter/in
+                      :spec-swagger.operation.parameter/name
+                      :spec-swagger.operation.parameter/description
+                      :spec-swagger.operation.parameter/required]))
+
+(spec/def :spec-swagger.json.operation/normal-parameter
+  (spec/and
+   :spec-swagger.json.operation/base-parameter
+   (spec/keys :req-un [:spec-swagger.operation.parameter/type])))
+
+(spec/def :spec-swagger.json.operation/body-parameter
+  (spec/and
+   :spec-swagger.json.operation/base-parameter
+   (spec/keys :req-un [:spec-swagger.operation.parameter/schema])))
+
+(spec/def :spec-swagger.json.operation.parameter/in
+  #{"path" "body"})
+
+
 (spec/def :spec-swagger/swagger-json
   (spec/and
    (spec/keys :req-un [:spec-swagger.json/swagger
@@ -203,11 +254,61 @@
 
 (def operation-defaults {:responses {:default {:description ""}}})
 
+;:parameters [{:description ""
+;              :in "path"
+;              :name "id"
+;              :required true
+;              :type "string"}
+;             {:description ""
+;              :in "body"
+;              :name "User"
+;              :required true
+;              :schema {:$ref "#/definitions/User"}}]
+
+;:parameters {:spec-swagger.operation.parameter.source/body {:description "BODY PARAM DESC"
+;                                                            :name "BODY PARAM"
+;                                                            :schema "BODY SCHEMA"
+;                                                            :spec-swagger.operation.parameter/source :spec-swagger.operation.parameter.source/body}
+;             :spec-swagger.operation.parameter.source/path [{:description "PATH PARAM DESC"
+;                                                             :name "PATH PARAM"
+;                                                             :spec-swagger.operation.parameter/source :spec-swagger.operation.parameter.source/path
+;                                                             :type "string"}
+
+
+
+(defn transform-parameters-for-source
+  [[source parameters]]
+  (println "SOURCE:" source)
+  (println "PARAMS:" parameters)
+  (for [p parameters]
+    (-> #spy/d {:in (name source)
+         :name #spy/d (:name #spy/d p)
+         :description (:description p)
+         :required (:required p)}
+        (assoc-if-exists :type (:type p))
+        (assoc-if-exists :schema (:schema p)))))
+
+(spec/fdef transform-parameters-for-source
+           :args (spec/cat
+                  :source-params
+                  (spec/spec
+                   (spec/cat :source :spec-swagger.operation.parameter/source
+                             :parameters (spec/spec (spec/+ :spec-swagger.operation/parameter)))))
+           :ret (spec/+ :spec-swagger.json.operation/parameter))
+
+(defn transform-parameters
+  [parameters]
+  (vec (mapcat transform-parameters-for-source parameters)))
+
 (defn transform-operation
   [operation]
+  (println "TRANSFORMING OPERATION:" operation)
   (merge
    operation-defaults
-   operation))
+   (-> operation
+       (assoc-if-not-empty
+        :parameters
+        (transform-parameters (:parameters operation))))))
 
 (spec/fdef transform-operation
            :args (spec/cat :operation :spec-swagger/operation)
