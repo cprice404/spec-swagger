@@ -6,6 +6,7 @@
             [ring.middleware.json :refer [wrap-json-response]]
             [clojure.spec :as spec]
             [clojure.set :as set]
+            [clojure.string :as str]
             [ring.swagger.validator :as swagger-validator]))
 
 (spec/instrument-ns 'cprice404.swagger-ui-service)
@@ -483,7 +484,8 @@
 (defn get-type-for-seq-spec-desc
   [spec spec-desc]
   ;; TODO: check that spec-desc is a map
-  (str "#/definitions/" (name spec)))
+  {:type {:$ref (str "#/definitions/" (name spec))}
+   :ref spec})
 
 (defn get-type-for-spec
   [spec]
@@ -491,34 +493,60 @@
     (println "Creating type for spec desc:" spec-desc)
     (if (coll? spec-desc)
       (get-type-for-seq-spec-desc spec spec-desc)
-      (condp = spec-desc
-        'string? "string"
-        'integer? "integer"
+      {:type {:type
+              (condp = spec-desc
+                'string? "string"
+                'integer? "integer"
 
-        (throw (IllegalStateException. (str "Unable to create type for spec " (pr-str spec-desc))))))))
+                (throw (IllegalStateException. (str "Unable to create type for spec " (pr-str spec-desc)))))}
+       :ref nil})))
+
+(defn get-props-and-refs
+  [spec-keys]
+  (reduce
+   (fn [acc k]
+     (println "adding spec for k:" k)
+     (let [{:keys [type ref]} (get-type-for-spec k)
+           acc (assoc-in acc
+                         [:props (keyword (name k))]
+                         type)]
+       (if ref
+         (do
+           (println "ADDING REF DEF:" ref)
+           (update-in acc [:refs] conj ref))
+         acc)))
+   {:props {}
+    :refs []}
+   spec-keys))
 
 (defn build-definitions
   [schema]
-  (let [spec-keys (get-keys-from-spec (:spec schema))]
+  (let [spec-keys (get-keys-from-spec (:spec schema))
+        schema-name (:schema-name schema)]
     (println "Spec keys:" spec-keys)
-    [(:schema-name schema)
-     {:additionalProperties false
-      :type "object"
-      :properties (reduce
-                   (fn [acc k]
-                     (println "adding spec for k:" k)
-                     (assoc acc (keyword (name k))
-                                {:type (get-type-for-spec k)}))
-                   {}
-                   spec-keys)}]))
+    (let [{:keys [props refs]} (get-props-and-refs spec-keys)
+          result [[schema-name
+                   {:additionalProperties false
+                    :type "object"
+                    :properties props}]]]
+      (if (empty? refs)
+        result
+        (do
+          (println "SHOULD BE DOING SOMETHING WITH REFS:" refs)
+          (vec (concat result (map build-definitions refs))))))))
 
 (defn extract-definitions
   [paths]
   (let [schemas (find-schemas paths)]
     (reduce
      (fn [acc schema]
-       (let [[n s] (build-definitions schema)]
-         (assoc acc n s)))
+       (let [defs (build-definitions schema)]
+         (println "DEFS:" defs)
+         (reduce
+          (fn [acc [n s]]
+            (assoc acc n s))
+          acc
+          defs)))
      {}
      schemas)))
 

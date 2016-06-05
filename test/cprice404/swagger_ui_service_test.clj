@@ -111,18 +111,23 @@
 
 (deftest extract-definitions-test
   (testing "able to extract definitions from paths"
-    (is (= {"User" {:type "object",
-                    :properties {:id {:type "string"},
-                                 :name {:type "string"},
-                                 :address {:$ref "#/definitions/UserAddress"}},
-                    :additionalProperties false,
-                    :required (:id :name :address)},
-            "UserAddress" {:type "object",
-                           :properties {:street {:type "string"},
-                                        :city {:type "string",
-                                               :enum (:tre :hki)}},
-                           :additionalProperties false,
-                           :required (:street :city)}}
+    (is (= {"User" {:type "object"
+                    :properties {:id {:type "string"}
+                                 :name {:type "string"}
+                                 :address {:$ref "#/definitions/address"}}
+                    :additionalProperties false}
+            "UserWithAge" {:type "object"
+                           :properties {:id {:type "string"}
+                                        :name {:type "string"}
+                                        :age {:type "integer"}
+                                        :address {:$ref "#/definitions/address"}}
+                           :additionalProperties false}
+            "UserAddress" {:type "object"
+                           :properties {:street {:type "string"}
+                                        :city {:type "string"
+                                               :enum [:tre :hki]}}
+                           :additionalProperties false
+                           :required [:street :city]}}
            (svc/extract-definitions
             {"/api/ping" {:get {}}
              "/user/{id}" {:post sample-operation}})))))
