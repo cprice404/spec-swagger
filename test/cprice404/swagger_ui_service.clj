@@ -169,13 +169,17 @@
 (spec/def :spec-swagger.operation.parameter.source/body
   (spec/tuple :spec-swagger.operation/body-parameter))
 
-
 (spec/def :spec-swagger.definition/schema
-  (spec/keys :req-un [:spec-swagger.definition/schema-name
-                      :spec-swagger.definition/spec]))
+  keyword?)
+;(spec/def :spec-swagger.definition/schema
+;  (spec/keys :req-un [:spec-swagger.definition/schema-name
+;                      :spec-swagger.definition/spec]))
+;
+;(spec/def :spec-swagger.definition/schema-name string?)
+;(spec/def :spec-swagger.definition/spec keyword?)
 
-(spec/def :spec-swagger.definition/schema-name string?)
-(spec/def :spec-swagger.definition/spec keyword?)
+
+
 
 ;
 ;(defmulti parameter-source :spec-swagger.operation.parameter/source)
@@ -299,7 +303,7 @@
 (defn transform-schema
   [s]
   (if s
-    {:$ref (str "#/definitions/" (:schema-name s))}))
+    {:$ref (str "#/definitions/" s)}))
 
 (spec/fdef transform-schema
            :args (spec/cat :s (spec/nilable :spec-swagger.definition/schema))
@@ -444,7 +448,7 @@
    #{}
    (vals paths)))
 
-(declare get-keys-from-spec)
+(declare get-keys-from-spec-desc)
 
 (defn get-keys-from-seq-spec-desc
   [spec-desc]
@@ -456,6 +460,8 @@
 
         (throw (IllegalStateException.
                 (str "Unsupported spec:" (prn-str spec-desc))))))
+
+(declare get-keys-from-spec)
 
 (defn get-keys-from-spec-desc
   [spec-desc]
@@ -483,9 +489,14 @@
 
 (defn get-type-for-seq-spec-desc
   [spec spec-desc]
-  ;; TODO: check that spec-desc is a map
-  {:type {:$ref (str "#/definitions/" (name spec))}
-   :ref spec})
+  (println "GET TYPE FOR SEQ SPEC DESC:" spec-desc)
+  (if (set? spec-desc)
+    ;; TODO: support other types besides strings
+    {:type {:type "string"
+            :enum (vec spec-desc)}}
+    ;; TODO: check that spec-desc is a 'keys' spec
+    {:type {:$ref (str "#/definitions/" (name spec))}
+     :ref spec}))
 
 (defn get-type-for-spec
   [spec]
@@ -520,12 +531,15 @@
    spec-keys))
 
 (defn build-definitions
-  [schema]
-  (let [spec-keys (get-keys-from-spec (:spec schema))
-        schema-name (:schema-name schema)]
+  [spec]
+  (let [spec-keys (get-keys-from-spec #_(:spec schema) spec)
+        ;schema-name (:schema-name schema)
+        ]
     (println "Spec keys:" spec-keys)
     (let [{:keys [props refs]} (get-props-and-refs spec-keys)
-          result [[schema-name
+          result [[;schema-name
+                   (name spec)
+
                    {:additionalProperties false
                     :type "object"
                     :properties props}]]]
@@ -533,7 +547,7 @@
         result
         (do
           (println "SHOULD BE DOING SOMETHING WITH REFS:" refs)
-          (vec (concat result (map build-definitions refs))))))))
+          (vec (concat result (mapcat build-definitions refs))))))))
 
 (defn extract-definitions
   [paths]

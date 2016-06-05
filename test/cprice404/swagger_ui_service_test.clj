@@ -4,32 +4,36 @@
             [clojure.spec :as spec]
             [ring.swagger.validator :as swagger-validator]))
 
-(def test-user-schema
-  {:schema-name "User"
-   :spec :swagger-ui-service-test/test-user-schema})
+;(def.user
+;  {:schema-name "User"
+;   :spec :swagger-ui-service-test/user})
 
-(spec/def :swagger-ui-service-test/test-user-schema
-  (spec/keys :req-un [:swagger-ui-test.test-user-schema/id
-                      :swagger-ui-test.test-user-schema/name
-                      :swagger-ui-test.test-user-schema/address]))
+(spec/def :swagger-ui-service-test/user
+  (spec/keys :req-un [:swagger-ui-service-test.user/id
+                      :swagger-ui-service-test.user/name
+                      :swagger-ui-service-test.user/address]))
 
-(spec/def :swagger-ui-test.test-user-schema/id string?)
-(spec/def :swagger-ui-test.test-user-schema/name string?)
+(spec/def :swagger-ui-service-test.user/id string?)
+(spec/def :swagger-ui-service-test.user/name string?)
 
-(spec/def :swagger-ui-test.test-user-schema/address
-  (spec/keys :req-un [:swagger-ui-test.test-user-schema.address/street
-                      :swagger-ui-test.test-user-schema.address/city]))
+(spec/def :swagger-ui-service-test.user/address
+  (spec/keys :req-un [:swagger-ui-service-test.user.address/street
+                      :swagger-ui-service-test.user.address/city]))
 
-(def test-user-with-age-schema
-  {:schema-name "UserWithAge"
-   :spec :swagger-ui-service-test/test-user-with-age-schema})
+(spec/def :swagger-ui-service-test.user.address/street string?)
+(spec/def :swagger-ui-service-test.user.address/city
+  #{"Portland" "Austin" "Belfast"})
 
-(spec/def :swagger-ui-service-test/test-user-with-age-schema
+;(def test-user-with-age-schema
+;  {:schema-name "UserWithAge"
+;   :spec :swagger-ui-service-test/user-with-age})
+
+  (spec/def :swagger-ui-service-test/user-with-age
   (spec/and
-   :swagger-ui-service-test/test-user-schema
-   (spec/keys :req-un [:swagger-ui-test.test-user-schema/age])))
+   :swagger-ui-service-test/user
+   (spec/keys :req-un [:swagger-ui-service-test.user/age])))
 
-(spec/def :swagger-ui-test.test-user-schema/age integer?)
+(spec/def :swagger-ui-service-test.user/age integer?)
 
 (def sample-operation
   {:summary "User Api"
@@ -48,8 +52,8 @@
                   :name "BODY PARAM"
                   :description "BODY PARAM DESC"
                   :required true
-                  :schema test-user-with-age-schema}]},
-   :responses {200 {:schema test-user-schema
+                  :schema :swagger-ui-service-test/user-with-age}]},
+   :responses {200 {:schema :swagger-ui-service-test/user
                     :description "Found it!"}
                404 {:description "Ohnoes."}}})
 
@@ -90,47 +94,50 @@
 
 (deftest find-schemas-test
   (testing "can find schemas in parameters and responses"
-    (is (= #{test-user-schema test-user-with-age-schema}
+    (is (= #{:swagger-ui-service-test/user
+             :swagger-ui-service-test/user-with-age}
            (svc/find-schemas {"/api/ping" {:get {}}
                               "/user/{id}" {:post sample-operation}})))))
 
 (deftest get-keys-from-spec-test
   (testing "simple spec with keys"
-    (is (= #{:swagger-ui-test.test-user-schema/id
-             :swagger-ui-test.test-user-schema/name
-             :swagger-ui-test.test-user-schema/address}
+    (is (= #{:swagger-ui-service-test.user/id
+             :swagger-ui-service-test.user/name
+             :swagger-ui-service-test.user/address}
            (svc/get-keys-from-spec
-            :swagger-ui-service-test/test-user-schema))))
+            :swagger-ui-service-test/user))))
   (testing "spec which 'and's in keys"
-    (is (= #{:swagger-ui-test.test-user-schema/id
-             :swagger-ui-test.test-user-schema/name
-             :swagger-ui-test.test-user-schema/address
-             :swagger-ui-test.test-user-schema/age}
+    (is (= #{:swagger-ui-service-test.user/id
+             :swagger-ui-service-test.user/name
+             :swagger-ui-service-test.user/address
+             :swagger-ui-service-test.user/age}
            (svc/get-keys-from-spec
-            :swagger-ui-service-test/test-user-with-age-schema)))))
+            :swagger-ui-service-test/user-with-age)))))
 
 (deftest extract-definitions-test
   (testing "able to extract definitions from paths"
-    (is (= {"User" {:type "object"
+    (is (= {"user" {:type "object"
                     :properties {:id {:type "string"}
                                  :name {:type "string"}
                                  :address {:$ref "#/definitions/address"}}
                     :additionalProperties false}
-            "UserWithAge" {:type "object"
+            "user-with-age" {:type "object"
                            :properties {:id {:type "string"}
                                         :name {:type "string"}
                                         :age {:type "integer"}
                                         :address {:$ref "#/definitions/address"}}
                            :additionalProperties false}
-            "UserAddress" {:type "object"
+            "address" {:type "object"
                            :properties {:street {:type "string"}
                                         :city {:type "string"
-                                               :enum [:tre :hki]}}
-                           :additionalProperties false
-                           :required [:street :city]}}
-           (svc/extract-definitions
-            {"/api/ping" {:get {}}
-             "/user/{id}" {:post sample-operation}})))))
+                                               :enum #{"Belfast"
+                                                       "Austin"
+                                                       "Portland"}}}
+                           :additionalProperties false}}
+           (-> (svc/extract-definitions
+                {"/api/ping" {:get {}}
+                 "/user/{id}" {:post sample-operation}})
+               (update-in ["address" :properties :city :enum] set))))))
 
 (deftest spec-swagger-json-test
   (testing "can generate valid swagger json"
