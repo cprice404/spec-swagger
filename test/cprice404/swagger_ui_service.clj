@@ -393,10 +393,11 @@
 
 (defn spec-swagger-json
   [swagger]
-  (extract-paths-and-definitions (:paths swagger))
+  #_(extract-paths-and-definitions (:paths swagger))
   (merge
    swagger-defaults
-   swagger)
+   (-> swagger
+       (assoc :paths (extract-paths-and-definitions (:paths swagger)))))
   #_(let [[paths definitions] (extract-paths-and-definitions (:paths swagger))]
     (merge
      swagger-defaults
@@ -433,14 +434,18 @@
                                                       :spec-swagger.operation.parameter.source/path
                                                       :name "PATH PARAM"
                                                       :description "PATH PARAM DESC"
+                                                      :required true
                                                       :type "string"}]
                                                     :spec-swagger.operation.parameter.source/body
-                                                    {:spec-swagger.operation.parameter/source
-                                                     :spec-swagger.operation.parameter.source/body
-                                                     :name "BODY PARAM"
-                                                     :description "BODY PARAM DESC"
-                                                     :schema "BODY SCHEMA"}}
-                                       :responses {200 {:schema "USER SPEC HERE"
+                                                    [{:spec-swagger.operation.parameter/source
+                                                      :spec-swagger.operation.parameter.source/body
+                                                      :name "BODY PARAM"
+                                                      :description "BODY PARAM DESC"
+                                                      :required true
+                                                      :schema {:schema-name "User"
+                                                               :spec ::test-user-schema}}]},
+                                       :responses {200 {:schema {:schema-name "User"
+                                                                 :spec ::test-user-schema}
                                                         :description "Found it!"}
                                                    404 {:description "Ohnoes."}}}}}})})
 
