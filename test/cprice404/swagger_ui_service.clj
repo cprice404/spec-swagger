@@ -148,7 +148,7 @@
 (spec/def :spec-swagger.operation/body-parameter
   (spec/and :spec-swagger.operation/base-parameter
             (spec/keys
-             :req-un [:spec-swagger.operation.parameter/schema])))
+             :req-un [:spec-swagger.definition/schema])))
 
 (spec/def :spec-swagger.operation/base-parameter
   (spec/keys :req-un [:spec-swagger.operation.parameter/name
@@ -162,14 +162,19 @@
 (spec/def :spec-swagger.operation.parameter/type
   #{"string"})
 
-(spec/def :spec-swagger.operation.parameter/schema
-  string?)
-
 (spec/def :spec-swagger.operation.parameter.source/path
   (spec/+ :spec-swagger.operation/normal-parameter))
 
 (spec/def :spec-swagger.operation.parameter.source/body
   (spec/tuple :spec-swagger.operation/body-parameter))
+
+
+(spec/def :spec-swagger.definition/schema
+  (spec/keys :req-un [:spec-swagger.definition/schema-name
+                      :spec-swagger.definition/spec]))
+
+(spec/def :spec-swagger.definition/schema-name string?)
+(spec/def :spec-swagger.definition/spec keyword?)
 
 ;
 ;(defmulti parameter-source :spec-swagger.operation.parameter/source)
@@ -187,7 +192,7 @@
 
 (spec/def :spec-swagger.operation/response
   (spec/keys :req-un [:spec-swagger.operation.response/description]
-             :opt-un [:spec-swagger.operation.response/schema]))
+             :opt-un [:spec-swagger.definition/schema]))
 
 ;(s/defschema Parameters
 ;             {(opt :body) s/Any
@@ -230,10 +235,25 @@
 (spec/def :spec-swagger.json.operation/body-parameter
   (spec/and
    :spec-swagger.json.operation/base-parameter
-   (spec/keys :req-un [:spec-swagger.operation.parameter/schema])))
+   (spec/keys :req-un [:spec-swagger.json.definition/schema])))
 
 (spec/def :spec-swagger.json.operation.parameter/in
   #{"path" "body"})
+
+(spec/def :spec-swagger.json.operation/responses
+  (spec/map-of (spec/or :http-response-code :spec-swagger/http-response-code
+                        :default #{:default})
+               :spec-swagger.json.operation/response))
+
+(spec/def :spec-swagger.json.operation/response
+  (spec/keys :req-un [:spec-swagger.operation.response/description]
+             :opt-un [:spec-swagger.json.definition/schema]))
+
+(spec/def :spec-swagger.json.definition/schema
+  (spec/keys :req-un [:spec-swagger.json.definition/$ref]))
+
+(spec/def :spec-swagger.json.definition/$ref
+  (spec/and string? #(re-matches #"^#/definitions/[\w]+$" %)))
 
 
 (spec/def :spec-swagger/swagger-json
@@ -275,6 +295,15 @@
 ;                                                             :type "string"}
 
 
+(defn transform-schema
+  [s]
+  (if s
+    {:$ref (str "#/definitions/" (:schema-name s))}))
+
+(spec/fdef transform-schema
+           :args (spec/cat :s (spec/nilable :spec-swagger.definition/schema))
+           :ret (spec/nilable :spec-swagger.json.definition/schema))
+
 
 (defn transform-parameters-for-source
   [[source parameters]]
@@ -285,8 +314,8 @@
          :name #spy/d (:name #spy/d p)
          :description (:description p)
          :required (:required p)}
-        (assoc-if-exists :type (:type p))
-        (assoc-if-exists :schema (:schema p)))))
+        (assoc-if-not-nil :type (:type p))
+        (assoc-if-not-nil :schema (transform-schema (:schema p))))))
 
 (spec/fdef transform-parameters-for-source
            :args (spec/cat
@@ -300,6 +329,25 @@
   [parameters]
   (vec (mapcat transform-parameters-for-source parameters)))
 
+(defn transform-response
+  [r]
+  (-> {:description (:description r)}
+      (assoc-if-not-nil :schema (transform-schema (:schema r)))))
+
+(defn transform-responses
+  [responses]
+  (reduce-kv
+   (fn [acc code r]
+     (assoc acc code (transform-response r)))
+   {}
+   responses))
+
+(spec/fdef transform-responses
+           :args (spec/cat
+                  :responses
+                  (spec/nilable :spec-swagger.operation/responses))
+           :ret (spec/nilable :spec-swagger.json.operation/responses))
+
 (defn transform-operation
   [operation]
   (println "TRANSFORMING OPERATION:" operation)
@@ -308,7 +356,10 @@
    (-> operation
        (assoc-if-not-empty
         :parameters
-        (transform-parameters (:parameters operation))))))
+        (transform-parameters (:parameters operation)))
+       (assoc-if-not-empty
+        :responses
+        (transform-responses (:responses operation))))))
 
 (spec/fdef transform-operation
            :args (spec/cat :operation :spec-swagger/operation)
@@ -318,8 +369,8 @@
 (defn transform-operations
   [operations]
   (println "TRANSFORMING OPERATIONS:" operations)
-  (reduce
-   (fn [acc [k v]]
+  (reduce-kv
+   (fn [acc k v]
      (println "ABOUT TO TRANSFORM: " v)
      (assoc acc k (transform-operation v)))
    {}
@@ -331,8 +382,8 @@
 
 (defn extract-paths-and-definitions
   [paths]
-  (reduce
-   (fn [acc [route operations]]
+  (reduce-kv
+   (fn [acc route operations]
      (assoc acc route (transform-operations operations)))
    {}
    paths))
