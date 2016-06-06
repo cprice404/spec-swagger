@@ -70,8 +70,8 @@
                  :name "BODY PARAM",
                  :description "BODY PARAM DESC",
                  :required true,
-                 :schema {:$ref "#/definitions/UserWithAge"}}],
-   :responses {200 {:schema {:$ref "#/definitions/User"},
+                 :schema {:$ref "#/definitions/user-with-age"}}],
+   :responses {200 {:schema {:$ref "#/definitions/user"},
                     :description "Found it!"},
                404 {:description "Ohnoes."}}})
 
@@ -122,18 +122,18 @@
                                  :address {:$ref "#/definitions/address"}}
                     :additionalProperties false}
             "user-with-age" {:type "object"
-                           :properties {:id {:type "string"}
-                                        :name {:type "string"}
-                                        :age {:type "integer"}
-                                        :address {:$ref "#/definitions/address"}}
-                           :additionalProperties false}
+                             :properties {:id {:type "string"}
+                                          :name {:type "string"}
+                                          :age {:type "integer"}
+                                          :address {:$ref "#/definitions/address"}}
+                             :additionalProperties false}
             "address" {:type "object"
-                           :properties {:street {:type "string"}
-                                        :city {:type "string"
-                                               :enum #{"Belfast"
-                                                       "Austin"
-                                                       "Portland"}}}
-                           :additionalProperties false}}
+                       :properties {:street {:type "string"}
+                                    :city {:type "string"
+                                           :enum #{"Belfast"
+                                                   "Austin"
+                                                   "Portland"}}}
+                       :additionalProperties false}}
            (-> (svc/extract-definitions
                 {"/api/ping" {:get {}}
                  "/user/{id}" {:post sample-operation}})
@@ -156,33 +156,42 @@
                     :description "User stuff"}]
             :paths {"/api/ping" {:get {}}
                     "/user/{id}" {:post sample-operation}}})]
-      (is (= {:swagger "2.0",
-              :info {:title "Sausages",
-                     :version "1.0.0",
-                     :description "Sausage description",
-                     :termsOfService "http://helloreverb.com/terms/",
-                     :contact {:name "My API Team",
-                               :email "foo@example.com",
-                               :url "http://www.metosin.fi"},
-                     :license {:name "Eclipse Public License",
-                               :url "http://www.eclipse.org/legal/epl-v10.html"}},
-              :produces ["application/json"],
-              :consumes ["application/json"],
-              :tags [{:name "user", :description "User stuff"}],
-              :paths {"/api/ping" {:get {:responses {:default {:description ""}}}},
-                      "/user/{id}" {:post transformed-sample-operation}},
-              :definitions {"User" {:type "object",
-                                    :properties {:id {:type "string"},
-                                                 :name {:type "string"},
-                                                 :address {:$ref "#/definitions/UserAddress"}},
-                                    :additionalProperties false,
-                                    :required (:id :name :address)},
-                            "UserAddress" {:type "object",
-                                           :properties {:street {:type "string"},
-                                                        :city {:type "string",
-                                                               :enum (:tre :hki)}},
-                                           :additionalProperties false,
-                                           :required (:street :city)}}}
-             result))
+      (is (= {:swagger "2.0"
+              :info {:title "Sausages"
+                     :version "1.0.0"
+                     :description "Sausage description"
+                     :termsOfService "http://helloreverb.com/terms/"
+                     :contact {:name "My API Team"
+                               :email "foo@example.com"
+                               :url "http://www.metosin.fi"}
+                     :license {:name "Eclipse Public License"
+                               :url "http://www.eclipse.org/legal/epl-v10.html"}}
+              :produces ["application/json"]
+              :consumes ["application/json"]
+              :tags [{:name "user" :description "User stuff"}]
+              :paths {"/api/ping" {:get {:responses {:default {:description ""}}}}
+                      "/user/{id}" {:post transformed-sample-operation}}
+              :definitions {"user" {:type "object"
+                                    :properties {:id {:type "string"}
+                                                 :name {:type "string"}
+                                                 :address {:$ref "#/definitions/address"}}
+                                    :additionalProperties false}
+                            "user-with-age" {:type "object"
+                                             :properties {:id {:type "string"}
+                                                          :name {:type "string"}
+                                                          :age {:type "integer"}
+                                                          :address {:$ref "#/definitions/address"}}
+                                             :additionalProperties false}
+                            "address" {:type "object"
+                                       :properties {:street {:type "string"}
+                                                    :city {:type "string"
+                                                           :enum #{"Belfast"
+                                                                   "Portland"
+                                                                   "Austin"}}}
+                                       :additionalProperties false}}}
+             (-> result
+                 (update-in
+                  [:definitions "address" :properties :city :enum]
+                  set))))
       (is (nil? (swagger-validator/validate result))))))
 

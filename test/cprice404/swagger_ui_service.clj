@@ -258,7 +258,7 @@
   (spec/keys :req-un [:spec-swagger.json.definition/$ref]))
 
 (spec/def :spec-swagger.json.definition/$ref
-  (spec/and string? #(re-matches #"^#/definitions/[\w]+$" %)))
+  (spec/and string? #(re-matches #"^#/definitions/[\w\-]+$" %)))
 
 
 (spec/def :spec-swagger/swagger-json
@@ -270,7 +270,7 @@
                        :spec-swagger.json/tags
                        :spec-swagger.json/paths])
    #(no-extra-keys? [:swagger :produces :consumes
-                     :info :tags :paths] %)))
+                     :info :tags :paths :definitions] %)))
 
 
 (def swagger-defaults {:swagger "2.0"
@@ -303,7 +303,7 @@
 (defn transform-schema
   [s]
   (if s
-    {:$ref (str "#/definitions/" s)}))
+    {:$ref (str "#/definitions/" (name s))}))
 
 (spec/fdef transform-schema
            :args (spec/cat :s (spec/nilable :spec-swagger.definition/schema))
@@ -570,7 +570,8 @@
   (merge
    swagger-defaults
    (-> swagger
-       (assoc :paths (transform-paths (:paths swagger)))))
+       (assoc :paths (transform-paths (:paths swagger)))
+       (assoc :definitions (extract-definitions (:paths swagger)))))
   #_(let [[paths definitions] (transform-paths (:paths swagger))]
     (merge
      swagger-defaults
