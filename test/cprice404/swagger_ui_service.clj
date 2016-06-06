@@ -9,7 +9,8 @@
             [clojure.spec :as spec]
             [clojure.set :as set]
             [clojure.string :as str]
-            [ring.swagger.validator :as swagger-validator]))
+            [ring.swagger.validator :as swagger-validator]
+            [ring.middleware.params :as params]))
 
 (spec/instrument-ns 'cprice404.swagger-ui-service)
 
@@ -725,14 +726,58 @@
                                                               :description "Found it!"}
                                                          404 {:description "Ohnoes."}}}}})
         context))
+;
+;(context "/math" []
+;         :tags ["math"]
+;
+;         (GET "/plus" []
+;              :return Total
+;              :query-params [x :- Long, y :- Long]
+;              :summary "x+y with query-parameters"
+;              (ok {:total (+ x y)}))
+;
+;         (POST "/minus" []
+;               :return Total
+;               :body-params [x :- Long, y :- Long]
+;               :summary "x-y with body-parameters"
+;               (ok {:total (- x y)}))
+;
+;         (GET "/times/:x/:y" []
+;              :return Total
+;              :path-params [x :- Long, y :- Long]
+;              :summary "x*y with path-parameters"
+;              (ok {:total (* x y)}))
+;
+;         (GET "/power" []
+;              :return Total
+;              :header-params [x :- Long, y :- Long]
+;              :summary "x^y with header-parameters"
+;              (ok {:total (long (Math/pow x y))})))
 
 (def foo-handler
-  (comidi/routes->handler
-   (comidi/context "/foo"
-     (comidi/GET "/bar" []
-                 "bar")
-     (comidi/GET "/baz" []
-                 "baz"))))
+  (params/wrap-params
+   (comidi/routes->handler
+    (comidi/context "/foo"
+      (comidi/GET "/bar" {}
+                  "bar")
+      (comidi/GET "/baz" []
+                  "baz")
+
+      (comidi/GET "/plus" [x y]
+                  {:body (str (+ (Integer/parseInt x)
+                                 (Integer/parseInt y)))})
+
+      (comidi/POST "/minus" [x y]
+                   {:body (str (- (Integer/parseInt x)
+                                  (Integer/parseInt y)))})
+
+      (comidi/GET ["/times/" :x "/" :y] [x y]
+                  {:body (str (* (Integer/parseInt x)
+                                 (Integer/parseInt y)))})
+
+      (comidi/GET "/power" [x y]
+                  {:body (str (long (Math/pow (Integer/parseInt x)
+                                              (Integer/parseInt y))))})))))
 
 (tk/defservice fooservice
   [[:SwaggerUIService register-paths]

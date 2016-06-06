@@ -14,6 +14,8 @@
 
                  [puppetlabs/comidi "0.3.1"]
 
+                 [ring/ring-core "1.4.0"]
+
                  ]
 
   :main puppetlabs.trapperkeeper.main
