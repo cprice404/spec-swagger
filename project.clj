@@ -18,6 +18,8 @@
 
                  ]
 
+  :profiles {:dev {:dependencies [[ring/ring-mock "0.3.0"]]}}
+
   :main puppetlabs.trapperkeeper.main
 
   )

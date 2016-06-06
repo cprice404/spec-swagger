@@ -754,28 +754,40 @@
 ;              :summary "x^y with header-parameters"
 ;              (ok {:total (long (Math/pow x y))})))
 
+
+
 (def foo-handler
   (params/wrap-params
    (comidi/routes->handler
     (comidi/context "/foo"
-      (comidi/GET "/bar" {}
-                  "bar")
-      (comidi/GET "/baz" []
-                  "baz")
+      ;(comidi/GET "/bar" {}
+      ;            "bar")
+      ;(comidi/GET "/baz" []
+      ;            "baz")
 
       (comidi/GET "/plus" [x y]
                   {:body (str (+ (Integer/parseInt x)
                                  (Integer/parseInt y)))})
+      ;(comidi/GET "/plus"
+      ;            {:return integer?
+      ;             :query-params [:foo-handler/x :foo-handler/y]
+      ;             :summary "x+y with query-parameters"}
+      ;            {:body (+ (Integer/parseInt x)
+      ;                      (Integer/parseInt y))})
 
-      (comidi/POST "/minus" [x y]
-                   {:body (str (- (Integer/parseInt x)
-                                  (Integer/parseInt y)))})
+      ;:return Total
+      ;              :query-params [x :- Long, y :- Long]
+      ;              :summary "x+y with query-parameters"
 
-      (comidi/GET ["/times/" :x "/" :y] [x y]
-                  {:body (str (* (Integer/parseInt x)
-                                 (Integer/parseInt y)))})
+      ;(comidi/POST "/minus" [x y]
+      ;             {:body (str (- (Integer/parseInt x)
+      ;                            (Integer/parseInt y)))})
+      ;
+      ;(comidi/GET ["/times/" :x "/" :y] [x y]
+      ;            {:body (str (* (Integer/parseInt x)
+      ;                           (Integer/parseInt y)))})
 
-      (comidi/GET "/power" [x y]
+      #_(comidi/GET "/power" [x y]
                   {:body (str (long (Math/pow (Integer/parseInt x)
                                               (Integer/parseInt y))))})))))
 

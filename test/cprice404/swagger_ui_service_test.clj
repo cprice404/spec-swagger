@@ -2,7 +2,8 @@
   (:require [clojure.test :refer :all]
             [cprice404.swagger-ui-service :as svc]
             [clojure.spec :as spec]
-            [ring.swagger.validator :as swagger-validator]))
+            [ring.swagger.validator :as swagger-validator]
+            [ring.mock.request :as mock]))
 
 (def sample-operation
   {:summary "User Api"
@@ -164,3 +165,10 @@
                   set))))
       (is (nil? (swagger-validator/validate result))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(deftest foo-handler-test
+  (testing "plus works"
+    (let [req (mock/request :get "/foo/plus?x=4&y=2")]
+      (is (= "6"
+             (:body (svc/foo-handler req)))))))
