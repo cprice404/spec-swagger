@@ -12,6 +12,8 @@
                  [puppetlabs/trapperkeeper "1.4.1"]
                  [puppetlabs/trapperkeeper-webserver-jetty9 "1.5.9"]
 
+                 [puppetlabs/comidi "0.3.1"]
+
                  ]
 
   :main puppetlabs.trapperkeeper.main

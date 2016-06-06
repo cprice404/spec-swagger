@@ -1,6 +1,7 @@
 (ns cprice404.swagger-ui-service
   (:require [puppetlabs.trapperkeeper.core :as tk]
             [puppetlabs.trapperkeeper.services :as tks]
+            [puppetlabs.comidi :as comidi]
             [ring.swagger.ui :as ring-swagger-ui]
             [ring.swagger.swagger2 :as rs]
             [schema.core :as schema]
@@ -699,7 +700,7 @@
                   (let [context (tks/service-context this)]
                     (swap! (:registered-paths context) merge paths))))
 
-(tk/defservice swagger-consumer-service
+#_(tk/defservice swagger-consumer-service
   [[:SwaggerUIService register-paths]]
   (init [this context]
         (register-paths {"/api/ping" {:get {}}
@@ -723,4 +724,19 @@
                                              :responses {200 {:schema :swagger-ui-service-test/user
                                                               :description "Found it!"}
                                                          404 {:description "Ohnoes."}}}}})
+        context))
+
+(def foo-handler
+  (comidi/routes->handler
+   (comidi/context "/foo"
+     (comidi/GET "/bar" []
+                 "bar")
+     (comidi/GET "/baz" []
+                 "baz"))))
+
+(tk/defservice fooservice
+  [[:SwaggerUIService register-paths]
+   [:WebroutingService add-ring-handler]]
+  (init [this context]
+        (add-ring-handler this foo-handler)
         context))
