@@ -2,6 +2,7 @@
   (:require [puppetlabs.trapperkeeper.core :as tk]
             [puppetlabs.trapperkeeper.services :as tks]
             [puppetlabs.comidi :as comidi]
+            [puppetlabs.comidi.spec :as comidi-spec]
             [ring.swagger.ui :as ring-swagger-ui]
             [ring.swagger.swagger2 :as rs]
             [schema.core :as schema]
@@ -758,22 +759,23 @@
 
 (def foo-handler
   (params/wrap-params
-   (comidi/routes->handler
-    (comidi/context "/foo"
+   (comidi-spec/routes->handler
+    (comidi-spec/context "/foo"
       ;(comidi/GET "/bar" {}
       ;            "bar")
       ;(comidi/GET "/baz" []
       ;            "baz")
 
-      (comidi/GET "/plus" [x y]
-                  {:body (str (+ (Integer/parseInt x)
-                                 (Integer/parseInt y)))})
-      ;(comidi/GET "/plus"
-      ;            {:return integer?
-      ;             :query-params [:foo-handler/x :foo-handler/y]
-      ;             :summary "x+y with query-parameters"}
-      ;            {:body (+ (Integer/parseInt x)
-      ;                      (Integer/parseInt y))})
+      ;(comidi/GET "/plus" [x y]
+      ;            {:body (str (+ (Integer/parseInt x)
+      ;                           (Integer/parseInt y)))})
+      (comidi-spec/GET "/plus"
+                       {:return integer?
+                        ;:query-params [:foo-handler/x :foo-handler/y]
+                        :bindings [x y]
+                        :summary "x+y with query-parameters"}
+                       {:body (str (+ (Integer/parseInt x)
+                                      (Integer/parseInt y)))})
 
       ;:return Total
       ;              :query-params [x :- Long, y :- Long]

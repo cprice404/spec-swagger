@@ -12,11 +12,9 @@
                  [puppetlabs/trapperkeeper "1.4.1"]
                  [puppetlabs/trapperkeeper-webserver-jetty9 "1.5.9"]
 
-                 [puppetlabs/comidi "0.3.1"]
+                 [puppetlabs/comidi "0.3.2-SNAPSHOT"]
 
-                 [ring/ring-core "1.4.0"]
-
-                 ]
+                 [ring/ring-core "1.4.0"]]
 
   :profiles {:dev {:dependencies [[ring/ring-mock "0.3.0"]]}}
 
