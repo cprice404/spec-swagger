@@ -1,5 +1,6 @@
 (ns cprice404.swagger-ui-service
   (:require [puppetlabs.trapperkeeper.core :as tk]
+            [puppetlabs.trapperkeeper.services :as tks]
             [ring.swagger.ui :as ring-swagger-ui]
             [ring.swagger.swagger2 :as rs]
             [schema.core :as schema]
@@ -585,7 +586,7 @@
 
 #_(spec/instrument-ns 'spec-swagger-json)
 
-(defn swagger-json2
+#_(defn swagger-json2
   []
   {:body (spec-swagger-json
           {:info {:version "1.0.0"
@@ -624,8 +625,9 @@
 #_(swagger-json2)
 
 (defn swagger-json2-handler
-  [req]
-  (swagger-json2))
+  [content registered-paths req]
+  {:body (spec-swagger-json
+          (assoc content :paths @registered-paths))})
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; test schemas
@@ -668,11 +670,57 @@
 
 (spec/instrument-ns 'cprice404.swagger-ui-service)
 
-
+(defprotocol SwaggerUIService
+  (register-paths [this paths]))
 
 (tk/defservice swagger-ui-service
+  SwaggerUIService
   [[:WebroutingService add-ring-handler]]
   (init [this context]
-        (add-ring-handler this (swagger-ui-handler) {:route-id :swagger})
-        (add-ring-handler this (wrap-json-response swagger-json2-handler) {:route-id :swagger-json})
+        (let [content {:info {:version "1.0.0"
+                              :title "Sausages"
+                              :description "Sausage description"
+                              :termsOfService "http://helloreverb.com/terms/"
+                              :contact {:name "My API Team"
+                                        :email "foo@example.com"
+                                        :url "http://www.metosin.fi"}
+                              :license {:name "Eclipse Public License"
+                                        :url "http://www.eclipse.org/legal/epl-v10.html"}}
+                       :tags [{:name "user"
+                               :description "User stuff"}]}
+              registered-paths (atom {})]
+          (add-ring-handler this (swagger-ui-handler) {:route-id :swagger})
+          (add-ring-handler this (wrap-json-response
+                                  (partial swagger-json2-handler content registered-paths))
+                            {:route-id :swagger-json})
+          (-> context
+              (assoc :registered-paths registered-paths))))
+  (register-paths [this paths]
+                  (let [context (tks/service-context this)]
+                    (swap! (:registered-paths context) merge paths))))
+
+(tk/defservice swagger-consumer-service
+  [[:SwaggerUIService register-paths]]
+  (init [this context]
+        (register-paths {"/api/ping" {:get {}}
+                         "/user/:id" {:post {:summary "FOO ENDPOINT"
+                                             :description "User Api DESCRIPTION"
+                                             :tags ["user"]
+                                             :parameters {:spec-swagger.operation.parameter.source/path
+                                                          [{:spec-swagger.operation.parameter/source
+                                                            :spec-swagger.operation.parameter.source/path
+                                                            :name "PATH PARAM"
+                                                            :description "PATH PARAM DESC"
+                                                            :required true
+                                                            :type "string"}]
+                                                          :spec-swagger.operation.parameter.source/body
+                                                          [{:spec-swagger.operation.parameter/source
+                                                            :spec-swagger.operation.parameter.source/body
+                                                            :name "BODY PARAM"
+                                                            :description "BODY PARAM DESC"
+                                                            :required true
+                                                            :schema :swagger-ui-service-test/user-with-age}]},
+                                             :responses {200 {:schema :swagger-ui-service-test/user
+                                                              :description "Found it!"}
+                                                         404 {:description "Ohnoes."}}}}})
         context))
