@@ -616,10 +616,8 @@
                                                       :name "BODY PARAM"
                                                       :description "BODY PARAM DESC"
                                                       :required true
-                                                      :schema {:schema-name "User"
-                                                               :spec ::test-user-schema}}]},
-                                       :responses {200 {:schema {:schema-name "User"
-                                                                 :spec ::test-user-schema}
+                                                      :schema :swagger-ui-service-test/user-with-age}]},
+                                       :responses {200 {:schema :swagger-ui-service-test/user
                                                         :description "Found it!"}
                                                    404 {:description "Ohnoes."}}}}}})})
 
@@ -628,6 +626,44 @@
 (defn swagger-json2-handler
   [req]
   (swagger-json2))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; test schemas
+
+;(def.user
+;  {:schema-name "User"
+;   :spec :swagger-ui-service-test/user})
+
+(spec/def :swagger-ui-service-test/user
+  (spec/keys :req-un [:swagger-ui-service-test.user/id
+                      :swagger-ui-service-test.user/name
+                      :swagger-ui-service-test.user/address]))
+
+(spec/def :swagger-ui-service-test.user/id string?)
+(spec/def :swagger-ui-service-test.user/name string?)
+
+(spec/def :swagger-ui-service-test.user/address
+  (spec/keys :req-un [:swagger-ui-service-test.user.address/street
+                      :swagger-ui-service-test.user.address/city]))
+
+(spec/def :swagger-ui-service-test.user.address/street string?)
+(spec/def :swagger-ui-service-test.user.address/city
+  #{"Portland" "Austin" "Belfast"})
+
+;(def test-user-with-age-schema
+;  {:schema-name "UserWithAge"
+;   :spec :swagger-ui-service-test/user-with-age})
+
+(spec/def :swagger-ui-service-test/user-with-age
+  (spec/and
+   :swagger-ui-service-test/user
+   (spec/keys :req-un [:swagger-ui-service-test.user/age])))
+
+(spec/def :swagger-ui-service-test.user/age integer?)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; end test schemas
+
 
 
 (spec/instrument-ns 'cprice404.swagger-ui-service)

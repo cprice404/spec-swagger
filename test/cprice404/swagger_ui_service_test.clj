@@ -4,37 +4,6 @@
             [clojure.spec :as spec]
             [ring.swagger.validator :as swagger-validator]))
 
-;(def.user
-;  {:schema-name "User"
-;   :spec :swagger-ui-service-test/user})
-
-(spec/def :swagger-ui-service-test/user
-  (spec/keys :req-un [:swagger-ui-service-test.user/id
-                      :swagger-ui-service-test.user/name
-                      :swagger-ui-service-test.user/address]))
-
-(spec/def :swagger-ui-service-test.user/id string?)
-(spec/def :swagger-ui-service-test.user/name string?)
-
-(spec/def :swagger-ui-service-test.user/address
-  (spec/keys :req-un [:swagger-ui-service-test.user.address/street
-                      :swagger-ui-service-test.user.address/city]))
-
-(spec/def :swagger-ui-service-test.user.address/street string?)
-(spec/def :swagger-ui-service-test.user.address/city
-  #{"Portland" "Austin" "Belfast"})
-
-;(def test-user-with-age-schema
-;  {:schema-name "UserWithAge"
-;   :spec :swagger-ui-service-test/user-with-age})
-
-  (spec/def :swagger-ui-service-test/user-with-age
-  (spec/and
-   :swagger-ui-service-test/user
-   (spec/keys :req-un [:swagger-ui-service-test.user/age])))
-
-(spec/def :swagger-ui-service-test.user/age integer?)
-
 (def sample-operation
   {:summary "User Api"
    :description "User Api description"
