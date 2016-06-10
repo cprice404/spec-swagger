@@ -13,6 +13,7 @@
                  [puppetlabs/trapperkeeper-webserver-jetty9 "1.5.9"]
 
                  [puppetlabs/comidi "0.3.2-SNAPSHOT"]
+                 [metosin/compojure-api "1.1.2"]
 
                  [ring/ring-core "1.4.0"]]
 
