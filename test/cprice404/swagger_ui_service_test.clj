@@ -172,50 +172,25 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(def scratch-routes
+  (comidi-spec/context "/foo"
+    (comidi-spec/GET "/plus"
+                     {:return integer?
+                      :query-params [:foo-handler/x :foo-handler/y]
+                      :summary "x+y with query-parameters"}
+                     {:body (str (+ (Integer/parseInt x)
+                                    (Integer/parseInt y)))})))
 
 (def scratch-handler
   (params/wrap-params
    (comidi-spec/routes->handler
-    (comidi-spec/context "/foo"
-      (comidi-spec/GET "/plus"
-                       {:return integer?
-                        :query-params [:foo-handler/x :foo-handler/y]
-                        :summary "x+y with query-parameters"}
-                       {:body (str (+ (Integer/parseInt x)
-                                      (Integer/parseInt y)))})
-      #_["/plus"
-       {:get #_(comidi-spec/handler-fn*
-                [x y]
-                ({:body (str (+ (Integer/parseInt x)
-                                (Integer/parseInt y)))}))
-        (fn [req]
-          (compojure-response/render
-           #_(compojure/let-request
-              [[x y] req]
-              {:body (str (+ (Integer/parseInt x)
-                             (Integer/parseInt y)))})
-           (do (println "......REQ.....")
-               (clojure.pprint/pprint req)
-               (println "......END REQ.....")
-               (let-request {:query-params [:scratch-handler/x
-                                            :scratch-handler/y]}
-                            req
-                            {:body (str (+ (Integer/parseInt x)
-                                           (Integer/parseInt y)))})
-               #_(let [x (get-in req [:query-params :x] (get-in req [:query-params "x"]))
-                     y (get-in req [:query-params :y] (get-in req [:query-params "y"]))]
-                 (do {:body (str (+ (Integer/parseInt x)
-                                    (Integer/parseInt y)))})))
-
-           req))}]))))
-
+    scratch-routes)))
 
 (deftest foo-handler-test
   (testing "plus works"
     (let [req (mock/request :get "/foo/plus?x=4&y=2")]
       (is (= "6"
-             (:body #_(svc/foo-handler req)
-              (scratch-handler req)))))))
+             (:body (scratch-handler req)))))))
 
 
 
