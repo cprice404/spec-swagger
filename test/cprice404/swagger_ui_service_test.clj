@@ -3,7 +3,12 @@
             [cprice404.swagger-ui-service :as svc]
             [clojure.spec :as spec]
             [ring.swagger.validator :as swagger-validator]
-            [ring.mock.request :as mock]))
+            [ring.mock.request :as mock]
+            [ring.middleware.params :as params]
+            [puppetlabs.comidi.spec :as comidi-spec]
+            [compojure.response :as compojure-response]
+            [compojure.core :as compojure]
+            [puppetlabs.kitchensink.core :as ks]))
 
 (def sample-operation
   {:summary "User Api"
@@ -167,8 +172,50 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+(def scratch-handler
+  (params/wrap-params
+   (comidi-spec/routes->handler
+    (comidi-spec/context "/foo"
+      (comidi-spec/GET "/plus"
+                       {:return integer?
+                        :query-params [:foo-handler/x :foo-handler/y]
+                        :summary "x+y with query-parameters"}
+                       {:body (str (+ (Integer/parseInt x)
+                                      (Integer/parseInt y)))})
+      #_["/plus"
+       {:get #_(comidi-spec/handler-fn*
+                [x y]
+                ({:body (str (+ (Integer/parseInt x)
+                                (Integer/parseInt y)))}))
+        (fn [req]
+          (compojure-response/render
+           #_(compojure/let-request
+              [[x y] req]
+              {:body (str (+ (Integer/parseInt x)
+                             (Integer/parseInt y)))})
+           (do (println "......REQ.....")
+               (clojure.pprint/pprint req)
+               (println "......END REQ.....")
+               (let-request {:query-params [:scratch-handler/x
+                                            :scratch-handler/y]}
+                            req
+                            {:body (str (+ (Integer/parseInt x)
+                                           (Integer/parseInt y)))})
+               #_(let [x (get-in req [:query-params :x] (get-in req [:query-params "x"]))
+                     y (get-in req [:query-params :y] (get-in req [:query-params "y"]))]
+                 (do {:body (str (+ (Integer/parseInt x)
+                                    (Integer/parseInt y)))})))
+
+           req))}]))))
+
+
 (deftest foo-handler-test
   (testing "plus works"
     (let [req (mock/request :get "/foo/plus?x=4&y=2")]
       (is (= "6"
-             (:body (svc/foo-handler req)))))))
+             (:body #_(svc/foo-handler req)
+              (scratch-handler req)))))))
+
+
+

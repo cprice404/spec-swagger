@@ -771,8 +771,8 @@
       ;                           (Integer/parseInt y)))})
       (comidi-spec/GET "/plus"
                        {:return integer?
-                        ;:query-params [:foo-handler/x :foo-handler/y]
-                        :bindings [x y]
+                        :query-params [:foo-handler/x :foo-handler/y]
+                        ;:bindings [x y]
                         :summary "x+y with query-parameters"}
                        {:body (str (+ (Integer/parseInt x)
                                       (Integer/parseInt y)))})
