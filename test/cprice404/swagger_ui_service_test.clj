@@ -175,7 +175,8 @@
 (def scratch-routes
   (comidi-spec/context "/foo"
     (comidi-spec/GET "/plus"
-                     {:return integer?
+                     ;; TODO: maybe have the macro inject the `spec/spec` part here?
+                     {:return (spec/spec integer?)
                       :query-params [:foo-handler/x :foo-handler/y]
                       :summary "x+y with query-parameters"}
                      {:body (str (+ (Integer/parseInt x)
@@ -186,11 +187,23 @@
    (comidi-spec/routes->handler
     scratch-routes)))
 
-(deftest foo-handler-test
+(deftest scratch-handler-test
   (testing "plus works"
     (let [req (mock/request :get "/foo/plus?x=4&y=2")]
       (is (= "6"
              (:body (scratch-handler req)))))))
+
+(deftest scratch-handler-specs-test
+  (testing "specs are attached to routes as metadata"
+    ;; TODO: do this with the zipper?
+    (let [plus-route (first (second scratch-routes))
+          plus-route-meta (meta plus-route)]
+      (is (= #{:return :query-params :summary}
+             (set (keys plus-route-meta))))
+      (is (= "x+y with query-parameters" (:summary plus-route-meta)))
+      (is (= [:foo-handler/x :foo-handler/y]
+             (:query-params plus-route-meta)))
+      (is (= 'integer? (spec/describe (:return plus-route-meta)))))))
 
 
 
