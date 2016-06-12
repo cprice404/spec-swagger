@@ -205,5 +205,16 @@
              (:query-params plus-route-meta)))
       (is (= 'integer? (spec/describe (:return plus-route-meta)))))))
 
+(deftest scratch-handler-register-paths-test
+  (testing "Can register paths based on route metadata"
+    (is (= {"/foo/plus" {:get
+                         {:responses
+                          {200 {:description ""
+                                :schema (spec/describe (spec/spec integer?))}}}}}
+           (-> (svc/register-paths* (atom {})
+                                 (comidi-spec/swagger-paths
+                                  scratch-routes))
+               (update-in ["/foo/plus" :get :responses 200 :schema]
+                          spec/describe))))))
 
 

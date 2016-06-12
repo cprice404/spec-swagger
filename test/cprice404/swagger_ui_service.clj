@@ -11,7 +11,8 @@
             [clojure.set :as set]
             [clojure.string :as str]
             [ring.swagger.validator :as swagger-validator]
-            [ring.middleware.params :as params]))
+            [ring.middleware.params :as params])
+  (:import (clojure.lang Atom)))
 
 (spec/instrument-ns 'cprice404.swagger-ui-service)
 
@@ -174,7 +175,9 @@
   (spec/tuple :spec-swagger.operation/body-parameter))
 
 (spec/def :spec-swagger.definition/schema
-  keyword?)
+  (spec/or
+   :spec spec/spec?
+   :keyword keyword?))
 ;(spec/def :spec-swagger.definition/schema
 ;  (spec/keys :req-un [:spec-swagger.definition/schema-name
 ;                      :spec-swagger.definition/spec]))
@@ -259,10 +262,15 @@
              :opt-un [:spec-swagger.json.definition/schema]))
 
 (spec/def :spec-swagger.json.definition/schema
-  (spec/keys :req-un [:spec-swagger.json.definition/$ref]))
+  (spec/or
+   :ref (spec/keys :req-un [:spec-swagger.json.definition/$ref])
+   :type (spec/keys :req-un [:spec-swagger.json.definition/type])))
 
 (spec/def :spec-swagger.json.definition/$ref
   (spec/and string? #(re-matches #"^#/definitions/[\w\-]+$" %)))
+
+(spec/def :spec-swagger.json.definition/type
+  #{"integer"})
 
 
 (spec/def :spec-swagger/swagger-json
@@ -303,11 +311,22 @@
 ;                                                             :spec-swagger.operation.parameter/source :spec-swagger.operation.parameter.source/path
 ;                                                             :type "string"}
 
+(defn spec-name [spec]
+  (if (keyword? spec)
+    (name spec)
+    (-> (meta spec) :clojure.spec/name)))
 
 (defn transform-schema
   [s]
   (if s
-    {:$ref (str "#/definitions/" (name s))}))
+   (let [descrip (spec/describe s)]
+     (println "TRANSFORMING SCHEMA:" s)
+     (cond
+       (= descrip 'integer?)
+       {:type "integer"}
+
+       :else
+       {:$ref (str "#/definitions/" (spec-name s))}))))
 
 (spec/fdef transform-schema
            :args (spec/cat :s (spec/nilable :spec-swagger.definition/schema))
@@ -340,6 +359,7 @@
 
 (defn transform-response
   [r]
+  (println "TRANSFORMING RESPONSE:" r)
   (-> {:description (:description r)}
       (assoc-if-not-nil :schema (transform-schema (:schema r)))))
 
@@ -477,6 +497,10 @@
       (keyword? spec-desc)
       (get-keys-from-spec spec-desc)
 
+      ;; schema is a single predicate, such as integer? ?
+      (symbol? spec-desc)
+      nil
+
       :else
       (throw (IllegalStateException.
               (str "Unsupported spec: " (prn-str spec-desc)))))))
@@ -539,19 +563,23 @@
   (let [spec-keys (get-keys-from-spec #_(:spec schema) spec)
         ;schema-name (:schema-name schema)
         ]
+    (println "BUILDING DEFINITIONS FOR SPEC:" spec "(" (spec/describe spec) ")")
     (println "Spec keys:" spec-keys)
-    (let [{:keys [props refs]} (get-props-and-refs spec-keys)
-          result [[;schema-name
-                   (name spec)
+    (println "Spec name:" (spec-name spec))
+    (if (empty? spec-keys)
+      []
+      (let [{:keys [props refs]} (get-props-and-refs spec-keys)
+            result [[;schema-name
+                     (name spec)
 
-                   {:additionalProperties false
-                    :type "object"
-                    :properties props}]]]
-      (if (empty? refs)
-        result
-        (do
-          (println "SHOULD BE DOING SOMETHING WITH REFS:" refs)
-          (vec (concat result (mapcat build-definitions refs))))))))
+                     {:additionalProperties false
+                      :type "object"
+                      :properties props}]]]
+        (if (empty? refs)
+          result
+          (do
+            (println "SHOULD BE DOING SOMETHING WITH REFS:" refs)
+            (vec (concat result (mapcat build-definitions refs)))))))))
 
 (defn extract-definitions
   [paths]
@@ -670,6 +698,14 @@
 ;; end test schemas
 
 
+(defn register-paths*
+  [registered-paths paths]
+  (swap! registered-paths merge paths))
+
+(spec/fdef register-paths*
+           :args (spec/cat :registered-paths #(instance? Atom %)
+                           :paths :spec-swagger/paths)
+           :ret :spec-swagger/paths)
 
 (spec/instrument-ns 'cprice404.swagger-ui-service)
 
@@ -700,7 +736,8 @@
               (assoc :registered-paths registered-paths))))
   (register-paths [this paths]
                   (let [context (tks/service-context this)]
-                    (swap! (:registered-paths context) merge paths))))
+                    (register-paths* (:registered-paths context)
+                                     paths))))
 
 #_(tk/defservice swagger-consumer-service
   [[:SwaggerUIService register-paths]]
@@ -755,47 +792,50 @@
 ;              :summary "x^y with header-parameters"
 ;              (ok {:total (long (Math/pow x y))})))
 
+(def foo-routes
+  (comidi-spec/context "/foo"
+    ;(comidi/GET "/bar" {}
+    ;            "bar")
+    ;(comidi/GET "/baz" []
+    ;            "baz")
+
+    ;(comidi/GET "/plus" [x y]
+    ;            {:body (str (+ (Integer/parseInt x)
+    ;                           (Integer/parseInt y)))})
+    (comidi-spec/GET "/plus"
+                     {:return (spec/spec integer?)
+                      :query-params [:foo-handler/x :foo-handler/y]
+                      ;:bindings [x y]
+                      :summary "x+y with query-parameters"}
+                     {:body (str (+ (Integer/parseInt x)
+                                    (Integer/parseInt y)))})
+
+    ;:return Total
+    ;              :query-params [x :- Long, y :- Long]
+    ;              :summary "x+y with query-parameters"
+
+    ;(comidi/POST "/minus" [x y]
+    ;             {:body (str (- (Integer/parseInt x)
+    ;                            (Integer/parseInt y)))})
+    ;
+    ;(comidi/GET ["/times/" :x "/" :y] [x y]
+    ;            {:body (str (* (Integer/parseInt x)
+    ;                           (Integer/parseInt y)))})
+
+    #_(comidi/GET "/power" [x y]
+                  {:body (str (long (Math/pow (Integer/parseInt x)
+                                              (Integer/parseInt y))))})))
 
 
 (def foo-handler
   (params/wrap-params
    (comidi-spec/routes->handler
-    (comidi-spec/context "/foo"
-      ;(comidi/GET "/bar" {}
-      ;            "bar")
-      ;(comidi/GET "/baz" []
-      ;            "baz")
-
-      ;(comidi/GET "/plus" [x y]
-      ;            {:body (str (+ (Integer/parseInt x)
-      ;                           (Integer/parseInt y)))})
-      (comidi-spec/GET "/plus"
-                       {:return integer?
-                        :query-params [:foo-handler/x :foo-handler/y]
-                        ;:bindings [x y]
-                        :summary "x+y with query-parameters"}
-                       {:body (str (+ (Integer/parseInt x)
-                                      (Integer/parseInt y)))})
-
-      ;:return Total
-      ;              :query-params [x :- Long, y :- Long]
-      ;              :summary "x+y with query-parameters"
-
-      ;(comidi/POST "/minus" [x y]
-      ;             {:body (str (- (Integer/parseInt x)
-      ;                            (Integer/parseInt y)))})
-      ;
-      ;(comidi/GET ["/times/" :x "/" :y] [x y]
-      ;            {:body (str (* (Integer/parseInt x)
-      ;                           (Integer/parseInt y)))})
-
-      #_(comidi/GET "/power" [x y]
-                  {:body (str (long (Math/pow (Integer/parseInt x)
-                                              (Integer/parseInt y))))})))))
+    foo-routes)))
 
 (tk/defservice fooservice
   [[:SwaggerUIService register-paths]
    [:WebroutingService add-ring-handler]]
   (init [this context]
         (add-ring-handler this foo-handler)
+        (register-paths (comidi-spec/swagger-paths foo-routes))
         context))
